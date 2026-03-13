@@ -21,3 +21,104 @@ dependencyResolutionManagement {
 
 rootProject.name = "DemoNoFramework"
 include ':app'
+include ':opencv'
+include ':integration:boofcv-jcodec'
+include ':applications'
+include ':main:boofcv-geo'
+include ':main:boofcv-ip-multiview'
+include ':integration:boofcv-javacv'
+include ':main:checks'
+include ':main:boofcv-reconstruction'
+include ':main:boofcv-core'
+include ':integration:boofcv-pdf'
+include ':main:boofcv-io'
+include ':main:boofcv-simulation'
+include ':main:boofcv-ip'
+include ':main:boofcv-types'
+include ':main:boofcv-learning'
+include ':integration:boofcv-WebcamCapture'
+include ':demonstrations'
+include ':main:boofcv-feature'
+include ':integration:boofcv-all'
+include ':main:boofcv-sfm'
+include ':integration:boofcv-ffmpeg'
+include ':integration:boofcv-kotlin'
+include ':main:boofcv-recognition'
+include ':examples'
+include ':main:autocode'
+include ':integration:boofcv-swing'
+include ':integration:boofcv-jcodec'
+include ':applications'
+include ':main:boofcv-geo'
+include ':main:boofcv-ip-multiview'
+include ':integration:boofcv-javacv'
+include ':main:checks'
+include ':main:boofcv-reconstruction'
+include ':main:boofcv-core'
+include ':integration:boofcv-pdf'
+include ':main:boofcv-io'
+include ':main:boofcv-simulation'
+include ':main:boofcv-ip'
+include ':main:boofcv-types'
+include ':main:boofcv-learning'
+include ':integration:boofcv-WebcamCapture'
+include ':demonstrations'
+include ':main:boofcv-feature'
+include ':integration:boofcv-all'
+include ':main:boofcv-sfm'
+include ':integration:boofcv-ffmpeg'
+include ':integration:boofcv-kotlin'
+include ':main:boofcv-recognition'
+include ':examples'
+include ':main:autocode'
+include ':integration:boofcv-swing'
+include ':integration:boofcv-jcodec'
+include ':applications'
+include ':main:boofcv-geo'
+include ':main:boofcv-ip-multiview'
+include ':integration:boofcv-javacv'
+include ':main:checks'
+include ':main:boofcv-reconstruction'
+include ':main:boofcv-core'
+include ':integration:boofcv-pdf'
+include ':main:boofcv-io'
+include ':main:boofcv-simulation'
+include ':main:boofcv-ip'
+include ':main:boofcv-types'
+include ':main:boofcv-learning'
+include ':integration:boofcv-WebcamCapture'
+include ':demonstrations'
+include ':main:boofcv-feature'
+include ':integration:boofcv-all'
+include ':main:boofcv-sfm'
+include ':integration:boofcv-ffmpeg'
+include ':integration:boofcv-kotlin'
+include ':main:boofcv-recognition'
+include ':examples'
+include ':main:autocode'
+include ':integration:boofcv-swing'
+project(':integration:boofcv-jcodec').projectDir = new File(rootDir, 'boofcv/integration/boofcv-jcodec/')
+project(':applications').projectDir = new File(rootDir, 'boofcv/applications/')
+project(':main:boofcv-geo').projectDir = new File(rootDir, 'boofcv/main/boofcv-geo/')
+project(':main:boofcv-ip-multiview').projectDir = new File(rootDir, 'boofcv/main/boofcv-ip-multiview/')
+project(':integration:boofcv-javacv').projectDir = new File(rootDir, 'boofcv/integration/boofcv-javacv/')
+project(':main:checks').projectDir = new File(rootDir, 'boofcv/main/checks/')
+project(':main:boofcv-reconstruction').projectDir = new File(rootDir, 'boofcv/main/boofcv-reconstruction/')
+project(':main:boofcv-core').projectDir = new File(rootDir, 'boofcv/main/boofcv-core/')
+project(':integration:boofcv-pdf').projectDir = new File(rootDir, 'boofcv/integration/boofcv-pdf/')
+project(':main:boofcv-io').projectDir = new File(rootDir, 'boofcv/main/boofcv-io/')
+project(':main:boofcv-simulation').projectDir = new File(rootDir, 'boofcv/main/boofcv-simulation/')
+project(':main:boofcv-ip').projectDir = new File(rootDir, 'boofcv/main/boofcv-ip/')
+project(':main:boofcv-types').projectDir = new File(rootDir, 'boofcv/main/boofcv-types/')
+project(':main:boofcv-learning').projectDir = new File(rootDir, 'boofcv/main/boofcv-learning/')
+project(':integration:boofcv-WebcamCapture').projectDir = new File(rootDir, 'boofcv/integration/boofcv-WebcamCapture/')
+project(':demonstrations').projectDir = new File(rootDir, 'boofcv/demonstrations/')
+project(':main:boofcv-feature').projectDir = new File(rootDir, 'boofcv/main/boofcv-feature/')
+project(':integration:boofcv-all').projectDir = new File(rootDir, 'boofcv/integration/boofcv-all/')
+project(':main:boofcv-sfm').projectDir = new File(rootDir, 'boofcv/main/boofcv-sfm/')
+project(':integration:boofcv-ffmpeg').projectDir = new File(rootDir, 'boofcv/integration/boofcv-ffmpeg/')
+project(':integration:boofcv-kotlin').projectDir = new File(rootDir, 'boofcv/integration/boofcv-kotlin/')
+project(':main:boofcv-recognition').projectDir = new File(rootDir, 'boofcv/main/boofcv-recognition/')
+project(':examples').projectDir = new File(rootDir, 'boofcv/examples/')
+project(':main:autocode').projectDir = new File(rootDir, 'boofcv/main/autocode/')
+project(':integration:boofcv-swing').projectDir = new File(rootDir, 'boofcv/integration/boofcv-swing/')

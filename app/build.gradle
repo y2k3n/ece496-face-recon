@@ -51,4 +51,18 @@ dependencies {
     implementation libs.camera.camera2
     implementation libs.camera.lifecycle
     implementation libs.camera.view
+
+    //api libs.boofcv.android
+    implementation libs.boofcv.android
+    implementation libs.boofcv.core
+    implementation libs.boofcv.geo
+    implementation libs.boofcv.io
+    implementation libs.boofcv.sfm
+
+    implementation libs.media3.exoplayer
+    implementation libs.androidx.media3.ui
+    implementation libs.androidx.media3.common
+    implementation libs.androidx.media3.inspector
+
+    implementation project(':opencv')
 }

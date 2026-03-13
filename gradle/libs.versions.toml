@@ -1,5 +1,6 @@
 [versions]
 agp = "8.13.1"
+boofcvAndroid = "1.2.4"
 cameraCore = "1.5.1"
 junit = "4.13.2"
 junitVersion = "1.3.0"
@@ -7,8 +8,18 @@ espressoCore = "3.7.0"
 appcompat = "1.7.1"
 material = "1.13.0"
 constraintlayout = "2.2.1"
+media3Exoplayer = "1.9.2"
 
 [libraries]
+androidx-media3-common = { module = "androidx.media3:media3-common", version.ref = "media3Exoplayer" }
+androidx-media3-inspector = { module = "androidx.media3:media3-inspector", version.ref = "media3Exoplayer" }
+androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Exoplayer" }
+boofcv-android = { module = "org.boofcv:boofcv-android", version.ref = "boofcvAndroid" }
+boofcv-core = { module = "org.boofcv:boofcv-core", version.ref = "boofcvAndroid" }
+boofcv-geo = { module = "org.boofcv:boofcv-geo", version.ref = "boofcvAndroid" }
+boofcv-io = { module = "org.boofcv:boofcv-io", version.ref = "boofcvAndroid" }
+boofcv-ip = { module = "org.boofcv:boofcv-ip", version.ref = "boofcvAndroid" }
+boofcv-sfm = { module = "org.boofcv:boofcv-sfm", version.ref = "boofcvAndroid" }
 camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraCore" }
 camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraCore" }
 camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraCore" }
@@ -19,6 +30,7 @@ espresso-core = { group = "androidx.test.espresso", name = "espresso-core", vers
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3Exoplayer" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

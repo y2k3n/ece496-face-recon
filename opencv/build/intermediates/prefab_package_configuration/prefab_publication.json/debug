@@ -1,0 +1,26 @@
+{
+  "installationFolder": "C:\\Users\\mwu06\\VScode\\VSCodeProjects\\ECE496\\ece496-face-recon\\opencv\\build\\intermediates\\prefab_package\\debug\\prefab",
+  "gradlePath": ":opencv",
+  "packageInfo": {
+    "packageName": "opencv",
+    "packageSchemaVersion": 2,
+    "packageDependencies": [],
+    "modules": [
+      {
+        "moduleName": "opencv_jni_shared",
+        "moduleHeaders": "C:\\Users\\mwu06\\VScode\\VSCodeProjects\\ECE496\\ece496-face-recon\\opencv\\native\\jni\\include",
+        "moduleExportLibraries": [],
+        "abis": [
+          {
+            "abiName": "x86_64",
+            "abiApi": 21,
+            "abiNdkMajor": 27,
+            "abiStl": "c++_shared",
+            "abiLibrary": "C:\\Users\\mwu06\\VScode\\VSCodeProjects\\ECE496\\ece496-face-recon\\opencv\\.cxx\\Debug\\6b1u652i\\x86_64\\libopencv_jni_shared.a",
+            "abiAndroidGradleBuildJsonFile": "C:\\Users\\mwu06\\VScode\\VSCodeProjects\\ECE496\\ece496-face-recon\\opencv\\.cxx\\Debug\\6b1u652i\\x86_64\\android_gradle_build.json"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -21,6 +21,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
 
+import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -33,7 +34,6 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 
 import java.io.OutputStream;
@@ -42,6 +42,31 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
+
+// OpenCV imports
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfDMatch;
+import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfKeyPoint;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.MatOfPoint3f;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
+
+import org.opencv.calib3d.Calib3d;
+import org.opencv.features2d.ORB;
+import org.opencv.features2d.BFMatcher;
+
+import android.widget.ImageView;
+
+// BoofCV
+import boofcv.android.ConvertBitmap;
+import boofcv.struct.image.GrayU8;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -51,6 +76,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private ActivityMainBinding binding;
+
+    private ImageView imageView;
 
     PreviewView previewView;
     private TextView txtCentral;
@@ -72,7 +99,6 @@ public class MainActivity extends AppCompatActivity {
     private float gx = 0, gy = 0, gz = 0;
     private float rx = 0, ry = 0, rz = 0, rw = 0;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -80,9 +106,7 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Example of a call to a native method
-//        TextView tv = binding.sampleText;
-//        tv.setText(stringFromJNI());
+        imageView = findViewById(R.id.imageView);
 
         previewView = findViewById(R.id.previewView);
         txtCentral = findViewById(R.id.txtIMU);
@@ -95,7 +119,6 @@ public class MainActivity extends AppCompatActivity {
         acc = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         rot = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
-
         startCameraXPreview();
 
         btnStart.setOnClickListener(v -> {
@@ -107,10 +130,15 @@ public class MainActivity extends AppCompatActivity {
                 startRecording();
             }
             recording = !recording;
-//            if (!recording) startRecording();
-//            else stopRecording();
+            if (!recording) startRecording();
+            else stopRecording();
         });
 
+        Button button = findViewById(R.id.supabutton);
+        button.setOnClickListener(v -> {
+            Log.d("BUTTONS", "Activating SfM test");
+            ReconstructSfM();
+        });
     }
 
     /**
@@ -185,7 +213,6 @@ public class MainActivity extends AppCompatActivity {
                 imuDataList.add(logEntry);
             }
 
-
             runOnUiThread(() -> {
                 String statStr = String.format(Locale.US,
                         "ACC: %.2f, %.2f, %.2f\nGYR: %.2f, %.2f, %.2f\nROT: %.2f, %.2f, %.2f, %2f",
@@ -199,10 +226,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onAccuracyChanged(Sensor sensor, int accuracy) { }
     };
-
-
-
-
 
     private void startRecording() {
         runOnUiThread(() -> txtCentral.setText("Start"));
@@ -227,8 +250,6 @@ public class MainActivity extends AppCompatActivity {
 
         currentRecording = videoCapture.getOutput().prepareRecording(this, outputOptions)
                 .start(ContextCompat.getMainExecutor(this), this::handleRecordingEvent);
-
-
     }
 
     private void stopRecording() {
@@ -288,5 +309,22 @@ public class MainActivity extends AppCompatActivity {
         }
         imuDataList.clear();
     }
+
+    // Function to execute SfM Reconstruction
+    private void ReconstructSfM() {
+
+        // Compute SfM Sparse Reconstruction
+        var sparse = new MultiViewSparseReconstruction(this);
+        sparse.compute("test.mp4", true);
+
+        // Compute SfM Dense Reconstruction
+        var dense = new MultiViewDenseReconstruction(sparse);
+        dense.compute();
+
+        System.out.println("### SfM Reconstruction Completed ###");
+    }
+
+
+
 
 }

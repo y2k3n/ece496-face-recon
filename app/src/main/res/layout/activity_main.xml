@@ -23,6 +23,21 @@
         android:layout_height="match_parent"
         />
 
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:srcCompat="@drawable/test" />
+
+    <Button
+        android:id="@+id/supabutton"
+        android:layout_width="208dp"
+        android:layout_height="157dp"
+        android:text="Reconstruct SfM"
+        app:layout_constraintBottom_toTopOf="@+id/btnStart"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <TextView
         android:id="@+id/txtIMU"
         android:layout_width="wrap_content"
@@ -58,5 +73,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -11,6 +11,34 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/boofcv/applications" />
+            <option value="$PROJECT_DIR$/boofcv/demonstrations" />
+            <option value="$PROJECT_DIR$/boofcv/examples" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-WebcamCapture" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-all" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-ffmpeg" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-javacv" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-jcodec" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-kotlin" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-pdf" />
+            <option value="$PROJECT_DIR$/boofcv/integration/boofcv-swing" />
+            <option value="$PROJECT_DIR$/boofcv/main/autocode" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-core" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-feature" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-geo" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-io" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-ip" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-ip-multiview" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-learning" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-recognition" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-reconstruction" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-sfm" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-simulation" />
+            <option value="$PROJECT_DIR$/boofcv/main/boofcv-types" />
+            <option value="$PROJECT_DIR$/boofcv/main/checks" />
+            <option value="$PROJECT_DIR$/integration" />
+            <option value="$PROJECT_DIR$/main" />
+            <option value="$PROJECT_DIR$/opencv" />
           </set>
         </option>
       </GradleProjectSettings>
