@@ -11,6 +11,12 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("demonoframework")
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF) # This makes CMake use -std=c++xx instead of -std=gnu++xx
+
+set(EOS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/eos)
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -27,6 +33,15 @@ project("demonoframework")
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         native-lib.cpp)
+
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+        ${EOS_DIR}/include
+        ${EOS_DIR}/3rdparty/eigen
+        ${EOS_DIR}/3rdparty/cereal/include
+        ${EOS_DIR}/3rdparty/nanoflann/include
+        ${EOS_DIR}/3rdparty/eigen3-nnls/src
+        ${EOS_DIR}/3rdparty/toml11
+)
 
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
