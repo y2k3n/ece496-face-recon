@@ -38,8 +38,12 @@
 #include <vector>
 #include <algorithm>
 
+#include "nanort/nanort.h"
+
 namespace eos {
 namespace render {
+
+
 
 /**
  * @brief Extracts the texture from the given image and returns a texture map.
@@ -69,8 +73,12 @@ namespace render {
  */
 inline eos::core::Image4u extract_texture(const core::Mesh& mesh, Eigen::Matrix4f view_model_matrix,
                                           Eigen::Matrix4f projection_matrix, ProjectionType projection_type,
-                                          const eos::core::Image4u& image, int texturemap_resolution = 512)
+                                          const eos::core::Image4u& image, int texturemap_resolution = 512,
+                                          bool compute_view_angle = false)
 {
+    // We know we only use orthographic, so don't bother with otherwise.
+    compute_view_angle &= (projection_type == ProjectionType::Orthographic);
+
     // Assert that either there are texture coordinates given for each vertex (in which case the texture map
     // doesn't contain any seams), or that a separate list of texture triangle indices is given (i.e. mesh.tti
     // is not empty):
@@ -109,6 +117,114 @@ inline eos::core::Image4u extract_texture(const core::Mesh& mesh, Eigen::Matrix4
     const vector<bool> per_vertex_visibility = compute_per_vertex_self_occlusion(
         mesh.vertices, mesh.tvi, view_model_matrix, ray_direction_type);
 
+    // std::vector<float> nanort_vertices;
+    // nanort_vertices.reserve(mesh.vertices.size() * 3);
+    // for (const auto &v : mesh.vertices) {
+    //   nanort_vertices.push_back(v[0]);
+    //   nanort_vertices.push_back(v[1]);
+    //   nanort_vertices.push_back(v[2]);
+    // }
+
+    // std::vector<unsigned int> nanort_indices;
+    // nanort_indices.reserve(mesh.tvi.size() * 3);
+    // for (const auto &tri : mesh.tvi) {
+    //   nanort_indices.push_back(static_cast<unsigned int>(tri[0]));
+    //   nanort_indices.push_back(static_cast<unsigned int>(tri[1]));
+    //   nanort_indices.push_back(static_cast<unsigned int>(tri[2]));
+    // }
+
+    // size_t stride = sizeof(float) * 3;
+    // nanort::TriangleMesh<float> triangle_mesh(nanort_vertices.data(),
+    //                                           nanort_indices.data(), stride);
+
+    // nanort::TriangleSAHPred<float> triangle_pred(nanort_vertices.data(),
+    //                                              nanort_indices.data(), stride);
+
+    // nanort::BVHBuildOptions<float> build_options;
+    // nanort::BVHAccel<float> accel;
+    // bool ret = accel.Build(nanort_indices.size() / 3, triangle_mesh,
+    //                        triangle_pred, build_options);
+    // if (!ret) {
+    //   throw std::runtime_error("nanort BVH build failed!");
+    // }
+
+    // std::vector<bool> per_vertex_visibility(mesh.vertices.size(), true);
+
+    // for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+    //   nanort::Ray<float> ray;
+    //   // we only use orthographic,
+    //   // so ray direction is always the same, and origin is the vertex
+    //   ray.org[0] = mesh.vertices[i][0];
+    //   ray.org[1] = mesh.vertices[i][1];
+    //   ray.org[2] = mesh.vertices[i][2];
+    //   ray.dir[0] = 0.0f;
+    //   ray.dir[1] = 0.0f;
+    //   ray.dir[2] = -1.0f;
+    //   ray.min_t = 1e-4f;
+    //   ray.max_t = 1e+6f;
+
+    //   nanort::TriangleIntersector<float> isector(nanort_vertices.data(),
+    //                                              nanort_indices.data(), stride);
+    //   nanort::TriangleIntersection<float> intersection;
+    //   bool hit = accel.Traverse(ray, isector, &intersection);
+
+    //   per_vertex_visibility[i] = !hit;
+    // }
+
+    std::vector<float> per_vertex_view_angle(mesh.vertices.size(), 1);
+    if (compute_view_angle) {
+
+      std::vector<Eigen::Vector3f> viewspace_vertices;
+      std::for_each(std::begin(mesh.vertices), std::end(mesh.vertices),
+                    [&viewspace_vertices, &view_model_matrix](const auto &v) {
+                      const Eigen::Vector4f transformed_vertex =
+                          view_model_matrix * v.homogeneous();
+                      viewspace_vertices.push_back(
+                          transformed_vertex.head<3>());
+                    });
+
+      std::vector<Eigen::Vector3f> vertex_normals(viewspace_vertices.size(),
+                                                  Eigen::Vector3f::Zero());
+      for (int tri = 0; tri < mesh.tvi.size(); ++tri) {
+        const auto &t = mesh.tvi[tri];
+        const Eigen::Vector3f &v0 = viewspace_vertices[t[0]];
+        const Eigen::Vector3f &v1 = viewspace_vertices[t[1]];
+        const Eigen::Vector3f &v2 = viewspace_vertices[t[2]];
+        Eigen::Vector3f face_normal = (v1 - v0).cross(v2 - v0);
+        if (face_normal.norm() > 1e-8f) face_normal.normalize();
+        vertex_normals[t[0]] += face_normal;
+        vertex_normals[t[1]] += face_normal;
+        vertex_normals[t[2]] += face_normal;
+      }
+
+      const Eigen::Vector3f view_dir(0.0f, 0.0f, 1.0f);
+
+      for (int i = 0; i < viewspace_vertices.size(); ++i) {
+        if (!per_vertex_visibility[i]) {
+          per_vertex_view_angle[i] = 0;
+          continue;
+        }
+
+        Eigen::Vector3f n = vertex_normals[i];
+        if (n.norm() > 1e-8f) {
+          n.normalize();
+        } else {
+          n = Eigen::Vector3f(0, 0, 1); // fallback
+        }
+
+        float cos_theta = n.dot(view_dir);
+        // cos_theta = std::max(-1.0f, std::min(1.0f, cos_theta));
+        // float angle = std::acos(cos_theta) * 180.0f / float(M_PI);
+        float alpha = std::max(0.0f, std::min(1.0f, cos_theta));
+        per_vertex_view_angle[i] = alpha;
+      }
+
+    } else {
+      for (int i = 0; i < mesh.vertices.size(); ++i) {
+        per_vertex_view_angle[i] = per_vertex_visibility[i] ? 255 : 0;
+      }
+    }
+
     vector<Vector4f> wnd_coords; // will contain [x_wnd, y_wnd, z_ndc, 1/w_clip]
     for (auto&& vtx : mesh.vertices)
     {
@@ -136,60 +252,74 @@ inline eos::core::Image4u extract_texture(const core::Mesh& mesh, Eigen::Matrix4
         const auto& tvi = mesh.tvi[triangle_index];
         const auto& tti = mesh_tti[triangle_index];
 
-        // Check if all three vertices of the current triangle are visible, and use the triangle if so:
+        // Check if all three vertices of the current triangle are visible, and
+        // use the triangle if so:
         if (per_vertex_visibility[tvi[0]] && per_vertex_visibility[tvi[1]] &&
             per_vertex_visibility[tvi[2]]) // can also try using ||, but...
         {
-            // The model's texcoords become the locations to extract to in the framebuffer (which is the
-            // texture map we're extracting to). The wnd_coords are the coordinates we're extracting from (the
-            // original image), which from the perspective of the rasteriser, is the texture map, and thus
-            // from the rasteriser's perspective they're the texture coords.
-            //
-            // (Note: A test with a rendered & re-extracted texture showed that we're off by a pixel or more,
-            //  definitely need to correct this. Probably here. It looks like it is 1-2 pixels off. Definitely
-            //  a bit more than 1.)
-            detail::Vertex<double> pa{
-                Vector4d(mesh.texcoords[tti[0]][0] * tex_width,
-					 mesh.texcoords[tti[0]][1] * tex_height,
-                     wnd_coords[tvi[0]].z(), // z_ndc
-                     wnd_coords[tvi[0]].w()), // 1/w_clip
-                Vector3d(),                       // empty
-                Vector2d(wnd_coords[tvi[0]].x() / image.width(),
-                     wnd_coords[tvi[0]].y() /
-                         image.height() // (maybe '1 - wndcoords...'?) wndcoords of the projected/rendered
-                                        // model triangle (in the input img). Normalised to 0,1.
-					)};
-            detail::Vertex<double> pb{
-                Vector4d(mesh.texcoords[tti[1]][0] * tex_width,
-				mesh.texcoords[tti[1]][1] * tex_height,
-                     wnd_coords[tvi[1]].z(), // z_ndc
-                     wnd_coords[tvi[1]].w()), // 1/w_clip
-                Vector3d(),                       // empty
-                Vector2d(wnd_coords[tvi[1]].x() / image.width(),
-                     wnd_coords[tvi[1]].y() /
-                         image.height() // (maybe '1 - wndcoords...'?) wndcoords of the projected/rendered
-                                        // model triangle (in the input img). Normalised to 0,1.
-					)};
-            detail::Vertex<double> pc{
-                Vector4d(mesh.texcoords[tti[2]][0] * tex_width,
-				mesh.texcoords[tti[2]][1] * tex_height,
-                     wnd_coords[tvi[2]].z(), // z_ndc
-				wnd_coords[tvi[2]].w()), // 1/w_clip
-                Vector3d(),                       // empty
-                Vector2d(wnd_coords[tvi[2]].x() / image.width(),
-                     wnd_coords[tvi[2]].y() /
-                         image.height() // (maybe '1 - wndcoords...'?) wndcoords of the projected/rendered
-                                        // model triangle (in the input img). Normalised to 0,1.
-					)};
-            // The wnd_coords (now p[a|b|c].texcoords) can actually be outside the image, if the head is
-            // outside the image. Just skip the whole triangle if that is the case:
-            if (pa.texcoords.x() < 0 || pa.texcoords.x() > 1 || pa.texcoords.y() < 0 || pa.texcoords.y() > 1 ||
-                pb.texcoords.x() < 0 || pb.texcoords.x() > 1 || pb.texcoords.y() < 0 || pb.texcoords.y() > 1 ||
-                pc.texcoords.x() < 0 || pc.texcoords.x() > 1 || pc.texcoords.y() < 0 || pc.texcoords.y() > 1)
-            {
-                continue;
-            }
-            extraction_rasterizer.raster_triangle(pa, pb, pc, image_to_extract_from_as_tex);
+          // The model's texcoords become the locations to extract to in the
+          // framebuffer (which is the texture map we're extracting to). The
+          // wnd_coords are the coordinates we're extracting from (the original
+          // image), which from the perspective of the rasteriser, is the
+          // texture map, and thus from the rasteriser's perspective they're the
+          // texture coords.
+          //
+          // (Note: A test with a rendered & re-extracted texture showed that
+          // we're off by a pixel or more,
+          //  definitely need to correct this. Probably here. It looks like it
+          //  is 1-2 pixels off. Definitely a bit more than 1.)
+          detail::Vertex<double> pa{
+              Vector4d(mesh.texcoords[tti[0]][0] * tex_width,
+                       mesh.texcoords[tti[0]][1] * tex_height,
+                       wnd_coords[tvi[0]].z(),  // z_ndc
+                       wnd_coords[tvi[0]].w()), // 1/w_clip
+              Vector3d(),                       // empty
+              Vector2d(wnd_coords[tvi[0]].x() / image.width(),
+                       wnd_coords[tvi[0]].y() / image.height()
+                       // (maybe '1 - wndcoords...'?) wndcoords of
+                       // the projected/rendered model triangle
+                       // (in the input img). Normalised to 0,1.
+                       ),
+              per_vertex_view_angle[tvi[0]]};
+          detail::Vertex<double> pb{
+              Vector4d(mesh.texcoords[tti[1]][0] * tex_width,
+                       mesh.texcoords[tti[1]][1] * tex_height,
+                       wnd_coords[tvi[1]].z(),  // z_ndc
+                       wnd_coords[tvi[1]].w()), // 1/w_clip
+              Vector3d(),                       // empty
+              Vector2d(wnd_coords[tvi[1]].x() / image.width(),
+                       wnd_coords[tvi[1]].y() / image.height()
+                       // (maybe '1 - wndcoords...'?) wndcoords of
+                       // the projected/rendered model triangle
+                       // (in the input img). Normalised to 0,1.
+                       ),
+              per_vertex_view_angle[tvi[1]]};
+          detail::Vertex<double> pc{
+              Vector4d(mesh.texcoords[tti[2]][0] * tex_width,
+                       mesh.texcoords[tti[2]][1] * tex_height,
+                       wnd_coords[tvi[2]].z(),  // z_ndc
+                       wnd_coords[tvi[2]].w()), // 1/w_clip
+              Vector3d(),                       // empty
+              Vector2d(wnd_coords[tvi[2]].x() / image.width(),
+                       wnd_coords[tvi[2]].y() / image.height()
+                       // (maybe '1 - wndcoords...'?) wndcoords of
+                       // the projected/rendered model triangle
+                       // (in the input img). Normalised to 0,1.
+                       ),
+              per_vertex_view_angle[tvi[2]]};
+          // The wnd_coords (now p[a|b|c].texcoords) can actually be outside the
+          // image, if the head is outside the image. Just skip the whole
+          // triangle if that is the case:
+          if (pa.texcoords.x() < 0 || pa.texcoords.x() > 1 ||
+              pa.texcoords.y() < 0 || pa.texcoords.y() > 1 ||
+              pb.texcoords.x() < 0 || pb.texcoords.x() > 1 ||
+              pb.texcoords.y() < 0 || pb.texcoords.y() > 1 ||
+              pc.texcoords.x() < 0 || pc.texcoords.x() > 1 ||
+              pc.texcoords.y() < 0 || pc.texcoords.y() > 1) {
+            continue;
+          }
+          extraction_rasterizer.raster_triangle(pa, pb, pc,
+                                                image_to_extract_from_as_tex);
         }
     }
 

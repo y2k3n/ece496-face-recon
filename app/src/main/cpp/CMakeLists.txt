@@ -11,6 +11,8 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("demonoframework")
 
+#find_package(OpenMP REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # This makes CMake use -std=c++xx instead of -std=gnu++xx
@@ -50,3 +52,8 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         android
         log)
+#target_link_libraries(${CMAKE_PROJECT_NAME} OpenMP::OpenMP_CXX)
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
+        -O3
+)

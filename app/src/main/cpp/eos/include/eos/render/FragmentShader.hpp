@@ -28,6 +28,7 @@
 
 #include "Eigen/Core"
 
+
 // Fragment shaders are a more accurate name for the same functionality as Pixel shaders. They aren't pixels
 // yet, since the output still has to past several tests (depth, alpha, stencil) as well as the fact that one
 // may be using anti-aliasing, which renders one-fragment-to-one-pixel non-true.
@@ -190,7 +191,10 @@ public:
             detail::tex2d_linear(image_tex_coords, 0, texture.value()) / 255.0f;
         const Eigen::Vector3<T> pixel_color =
             Eigen::Vector3<T>(texture_color[2], texture_color[1], texture_color[0]);
-        return Eigen::Vector4<T>(pixel_color[0], pixel_color[1], pixel_color[2], T(1));
+        const T pixel_alpha = point_a.alpha * corrected_lambda[0] +
+                              point_b.alpha * corrected_lambda[1] +
+                              point_c.alpha * corrected_lambda[2];
+        return Eigen::Vector4<T>(pixel_color[0], pixel_color[1], pixel_color[2], pixel_alpha);
     };
 };
 

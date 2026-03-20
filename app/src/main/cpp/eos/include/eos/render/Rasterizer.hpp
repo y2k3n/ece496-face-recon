@@ -35,6 +35,8 @@
 
 #include <limits>
 
+#include <iostream>
+
 namespace eos {
 namespace render {
 
@@ -238,6 +240,8 @@ public:
                             static_cast<unsigned char>(255.0f * std::min(pixel_color[2], T(1)));
                         const unsigned char alpha =
                             static_cast<unsigned char>(255.0f * std::min(pixel_color[3], T(1)));
+                        // std::cout << "pixel_color (clamped): " << (int)red << ", " << (int)green << ", " << (int)blue
+                        //           << ", " << (int)alpha << std::endl;
 
                         // update buffers
                         colorbuffer(pixel_index_row, pixel_index_col)[0] = blue;

@@ -51,6 +51,7 @@ struct Vertex
     Eigen::Vector4<T> position;  // XYZW
     Eigen::Vector3<T> color;     // RGB order
     Eigen::Vector2<T> texcoords; // UV
+    T alpha = T(1);
 };
 
 } /* namespace detail */

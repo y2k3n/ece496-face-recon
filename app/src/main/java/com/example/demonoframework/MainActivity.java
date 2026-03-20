@@ -10,11 +10,8 @@ import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import androidx.annotation.NonNull;
 
-import android.content.ContentValues;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
-import android.provider.MediaStore;
 import android.util.Log;
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -39,13 +36,14 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
-import com.google.mediapipe.tasks.components.containers.NormalizedKeypoint;
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark;
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker;
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult;
 import com.google.mediapipe.tasks.core.BaseOptions;
 import com.google.mediapipe.tasks.core.Delegate;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
+import androidx.exifinterface.media.ExifInterface;
+import android.graphics.Matrix;
 
 //import android.graphics.Bitmap;
 
@@ -57,6 +55,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import android.os.Environment;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -72,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
 
     PreviewView previewView;
     private TextView txtCentral;
-    private TextView txtStatus;
+//    private TextView txtStatus;
     Button btnStart;
 
     private ImageCapture imageCapture;
@@ -88,8 +87,10 @@ public class MainActivity extends AppCompatActivity {
     private float rx = 0, ry = 0, rz = 0, rw = 0;
 
     // store saved photo URIs and per-photo IMU snapshot
-    private final List<Uri> photoUris = new ArrayList<>();
+    private final List<String> photoFilePaths = new ArrayList<>();
     private final List<String> photoImuEntries = new ArrayList<>();
+    private final List<String> ptsFilePaths = new ArrayList<>();
+    private String imuFilePath = null;
     private int photoCounter = 0;
 
     private FrameLayout overlayContainer = null;
@@ -102,11 +103,13 @@ public class MainActivity extends AppCompatActivity {
     // FaceLandmarker instance for face detection
     private FaceLandmarker faceLandmarker = null;
 
+    private int imageWidth = 0, imageHeight = 0;
+
     /**
      * A native method that is implemented by the 'demonoframework' native library,
      * which is packaged with this application.
      */
-    public native String stringFromJNI();
+    public native String runJNI(int w, int h, String extDirPath, String[] imagePaths, String[] landmarkPaths);
 
 
     @Override
@@ -118,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
 
         previewView = findViewById(R.id.previewView);
         txtCentral = findViewById(R.id.txtSysStatus);
-        txtStatus = findViewById(R.id.txtIMUStatus);
+//        txtStatus = findViewById(R.id.txtIMUStatus);
         btnStart = findViewById(R.id.btnCapture);
 
         // Show initial capture prompt
@@ -137,6 +140,8 @@ public class MainActivity extends AppCompatActivity {
         } else {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
         }
+
+        deleteAllExceptShared();
 
         btnStart.setOnClickListener(v -> takePhoto());
 
@@ -227,14 +232,14 @@ public class MainActivity extends AppCompatActivity {
 
             // we keep current IMU values updated continuously; snapshots will be taken on shutter
 
-            runOnUiThread(() -> {
-                String statStr = String.format(Locale.US,
-                        "ACC: %.2f, %.2f, %.2f\nGYR: %.2f, %.2f, %.2f\nROT: %.2f, %.2f, %.2f, %.2f",
-                        ax, ay, az, gx, gy, gz, rx, ry, rz, rw);
-                if (txtStatus != null) {
-                    txtStatus.setText(statStr);
-                }
-            });
+            // runOnUiThread(() -> {
+            //     String statStr = String.format(Locale.US,
+            //             "ACC: %.2f, %.2f, %.2f\nGYR: %.2f, %.2f, %.2f\nROT: %.2f, %.2f, %.2f, %.2f",
+            //             ax, ay, az, gx, gy, gz, rx, ry, rz, rw);
+            //     if (txtStatus != null) {
+            //         txtStatus.setText(statStr);
+            //     }
+            // });
         }
 
         @Override
@@ -286,54 +291,30 @@ public class MainActivity extends AppCompatActivity {
 
     private void takePhoto() {
         if (imageCapture == null) return;
-
-        // Show which frame is being captured
         runOnUiThread(() -> txtCentral.setText("Capturing frame " + (photoCounter + 1)));
-        // Prompt saving
-        runOnUiThread(() -> txtCentral.setText("Saving frame " + (photoCounter + 1) + "...") );
-
+        runOnUiThread(() -> txtCentral.setText("Saving frame " + (photoCounter + 1) + "..."));
         if (baseName == null) {
             baseName = "FaceCapture_" + System.currentTimeMillis();
             photoCounter = 0;
-            photoUris.clear();
+            photoFilePaths.clear();
             photoImuEntries.clear();
         }
-
-        String photoFileName = baseName + "_Cam_" + (photoCounter + 1) + ".jpg";
-
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, photoFileName);
-        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
-        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH,
-                Environment.DIRECTORY_PICTURES + java.io.File.separator + "FaceCaptures");
-
-        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(
-                getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                .build();
-
-        // Capture snapshot of IMU at this moment
+        String photoFileName = baseName + "_Frame" + (photoCounter + 1) + ".jpg";
+        File dir = getExternalFilesDir(null);
+        File photoFile = new File(dir, photoFileName);
         long timestamp = System.currentTimeMillis();
         String imuSnapshot = String.format(Locale.US,
                 "%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f",
                 timestamp, ax, ay, az, gx, gy, gz, rx, ry, rz, rw);
-
+        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
         imageCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(this),
                 new ImageCapture.OnImageSavedCallback() {
                     @Override
                     public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
-                        Uri savedUri = outputFileResults.getSavedUri();
-                        if (savedUri != null) {
-                            photoUris.add(savedUri);
-                            photoImuEntries.add(imuSnapshot);
-                            photoCounter++;
-
-                            runOnUiThread(() -> txtCentral.setText("Frame " + photoCounter + " saved"));
-
-                            // Show captured image overlay with options
-                            runOnUiThread(() -> showCapturedOverlay(savedUri));
-                        } else {
-                            runOnUiThread(() -> txtCentral.setText("Frame saved but URI null"));
-                        }
+                        photoFilePaths.add(photoFile.getAbsolutePath());
+                        photoImuEntries.add(imuSnapshot);
+                        photoCounter++;
+                        runOnUiThread(() -> showCapturedOverlay(photoFile.getAbsolutePath()));
                     }
 
                     @Override
@@ -344,7 +325,34 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    private void showCapturedOverlay(Uri imageUri) {
+    private Bitmap getCorrectlyOrientedBitmap(String imagePath) {
+        Bitmap bitmap = BitmapFactory.decodeFile(imagePath);
+        try {
+            ExifInterface exif = new ExifInterface(imagePath);
+            int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+            int rotate = 0;
+            switch (orientation) {
+                case ExifInterface.ORIENTATION_ROTATE_90: rotate = 90; break;
+                case ExifInterface.ORIENTATION_ROTATE_180: rotate = 180; break;
+                case ExifInterface.ORIENTATION_ROTATE_270: rotate = 270; break;
+            }
+            if (rotate != 0 && bitmap != null) {
+                Matrix matrix = new Matrix();
+                matrix.postRotate(rotate);
+                bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+            }
+        } catch (Exception e) {
+            // ignore or log
+        }
+        return bitmap;
+    }
+
+    private void showCapturedOverlay(String imagePath) {
+        Bitmap bitmap = getCorrectlyOrientedBitmap(imagePath);
+        imageWidth = bitmap.getWidth();
+        imageHeight = bitmap.getHeight();
+        runOnUiThread(() -> txtCentral.setText("Frame " + photoCounter + " saved: " + imageWidth + "x" + imageHeight));
+
         // Create overlay container if not exists
         if (overlayContainer == null) {
             overlayContainer = new FrameLayout(this);
@@ -361,7 +369,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         ivLp.gravity = Gravity.CENTER;
         imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        imageView.setImageURI(imageUri);
+        imageView.setImageBitmap(bitmap);
         overlayContainer.addView(imageView, ivLp);
 
         // Buttons container
@@ -380,11 +388,12 @@ public class MainActivity extends AppCompatActivity {
         retakeLp.setMargins(40, 0, 0, 40);
         btnRetake.setOnClickListener(v -> {
             // Delete last saved photo and remove entry
-            if (!photoUris.isEmpty()) {
-                Uri last = photoUris.remove(photoUris.size() - 1);
+            if (!photoFilePaths.isEmpty()) {
+                String lastPath = photoFilePaths.remove(photoFilePaths.size() - 1);
                 photoImuEntries.remove(photoImuEntries.size() - 1);
                 try {
-                    getContentResolver().delete(last, null, null);
+                    File lastFile = new File(lastPath);
+                    if (lastFile.exists()) lastFile.delete();
                 } catch (Exception e) {
                     Log.w("IMU", "Failed to delete retaken image: " + e.getMessage());
                 }
@@ -437,74 +446,48 @@ public class MainActivity extends AppCompatActivity {
     private void finishCaptures() {
         if (baseName == null) return;
 
-//        String imuFileName = baseName + "_IMU.csv";
-//
-//        ContentValues contentValues = new ContentValues();
-//        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, imuFileName);
-//        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "text/csv");
-//        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH,
-//                Environment.DIRECTORY_DOWNLOADS + java.io.File.separator + "FaceCaptures");
+        saveImuData();
 
-//        Uri collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
-//        Uri imuUri = getContentResolver().insert(collectionUri, contentValues);
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(imuEventListener);
+        }
 
-//        if (imuUri == null) {
-//            runOnUiThread(() -> txtCentral.setText("IMU Save Failed: Failed to create MediaStore entry."));
-//            photoUris.clear();
-//            photoImuEntries.clear();
-//            baseName = null;
-//            return;
-//        }
-
-//        OutputStream outputStream = null;
-//        try {
-//            outputStream = getContentResolver().openOutputStream(imuUri);
-//            if (outputStream == null) throw new IOException("Failed to open output stream");
-//            try (PrintWriter writer = new PrintWriter(outputStream)) {
-//                writer.println("photo_index,photo_uri,timestamp,ax,ay,az,gx,gy,gz,rx,ry,rz,rw");
-//                for (int i = 0; i < photoImuEntries.size(); i++) {
-//                    String imuEntry = photoImuEntries.get(i);
-//                    Uri photoUri = photoUris.size() > i ? photoUris.get(i) : null;
-//                    String line = String.format(Locale.US, "%d,%s,%s",
-//                            i + 1,
-//                            photoUri != null ? photoUri.toString() : "",
-//                            imuEntry);
-//                    writer.println(line);
-//                }
-//                writer.flush();
-//            }
-
-            runOnUiThread(() -> {
-                txtCentral.setText("Saved " + photoUris.size() + " photos and IMU data");
-                // turn off camera preview to indicate session end
-                if (cameraProviderRef != null) {
-                    try {
-                        cameraProviderRef.unbindAll();
-                    } catch (Exception e) {
-                        Log.w("CameraX", "Failed to unbind camera: " + e.getMessage());
-                    }
+        runOnUiThread(() -> {
+            txtCentral.setText("Saved " + photoFilePaths.size() + " photos and IMU data");
+            // turn off camera preview to indicate session end
+            if (cameraProviderRef != null) {
+                try {
+                    cameraProviderRef.unbindAll();
+                } catch (Exception e) {
+                    Log.w("CameraX", "Failed to unbind camera: " + e.getMessage());
                 }
-                // Hide preview and IMU UI
-                if (previewView != null) previewView.setVisibility(View.GONE);
+            }
+            // Hide preview and IMU UI
+            if (previewView != null) previewView.setVisibility(View.GONE);
 //                if (txtCentral != null) txtCentral.setVisibility(View.GONE);
-                if (txtStatus != null) txtStatus.setVisibility(View.GONE);
-                if (btnStart != null) btnStart.setVisibility(View.GONE);
-                showNextStepOverlay();
-            });
-//        } catch (IOException e) {
-//            try {
-//                getContentResolver().delete(imuUri, null, null);
-//            } catch (Exception ex) {
-//                Log.w("IMU", "Failed to delete incomplete IMU file: " + ex.getMessage());
-//            }
-//            runOnUiThread(() -> txtCentral.setText("IMU Save Failed: " + e.getMessage()));
-//        }
+//            if (txtStatus != null) txtStatus.setVisibility(View.GONE);
+            if (btnStart != null) btnStart.setVisibility(View.GONE);
+            showNextStepOverlay();
+        });
+    }
 
-        // Reset session
-//        photoUris.clear();
-//        photoImuEntries.clear();
-//        baseName = null;
-//        photoCounter = 0;
+    private void saveImuData() {
+        String imuFileName = baseName + "_IMU.csv";
+        File dir = getExternalFilesDir(null);
+        File imuFile = new File(dir, imuFileName);
+        imuFilePath = imuFile.getAbsolutePath();
+        try (FileOutputStream fos = new FileOutputStream(imuFile)) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("timestamp,ax,ay,az,gx,gy,gz,rx,ry,rz,rw\n");
+            for (String entry : photoImuEntries) {
+                sb.append(entry).append("\n");
+            }
+            fos.write(sb.toString().getBytes());
+            fos.flush();
+            runOnUiThread(() -> txtCentral.setText("IMU data saved to: " + imuFilePath));
+        } catch (IOException e) {
+            runOnUiThread(() -> txtCentral.setText("IMU Save Failed: " + e.getMessage()));
+        }
     }
 
     // Show overlay with "Continue to data processing" button
@@ -517,7 +500,26 @@ public class MainActivity extends AppCompatActivity {
             root.addView(nextStepOverlay, lp);
         }
         nextStepOverlay.removeAllViews();
-        nextStepOverlay.setBackgroundColor(0x99000000); // semi-transparent black
+        nextStepOverlay.setBackgroundColor(0xDD000000); // semi-transparent black
+
+        if (faceLandmarker == null) {
+            runOnUiThread(() -> txtCentral.setText("FaceLandmarker not initialized."));
+            return;
+        }
+        runOnUiThread(() -> txtCentral.setText("Processing face landmarks..."));
+
+        List<FaceLandmarkerResult> results = detectAllPhotoLandmarks(faceLandmarker);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Processing face landmarks...\n\n");
+        sb.append("Face detection results:\n");
+        sb.append("Size = ").append(results.size()).append("\n\n");
+        for (int i = 0; i < results.size(); i++) {
+            FaceLandmarkerResult r = results.get(i);
+            int count = (r != null && r.faceLandmarks() != null) ? r.faceLandmarks().size() : 0;
+            sb.append("Photo ").append(i + 1).append(": ").append(count).append(" face(s)\n");
+        }
+        sb.append("\nReady to model with valid frames!");
+        runOnUiThread(() -> txtCentral.setText(sb.toString()));
 
         Button btnNext = new Button(this);
         btnNext.setText("Continue to data processing");
@@ -527,26 +529,15 @@ public class MainActivity extends AppCompatActivity {
         btnNext.setLayoutParams(btnLp);
         btnNext.setOnClickListener(v -> {
             nextStepOverlay.removeAllViews();
-            nextStepOverlay.setVisibility(View.GONE);
-            runOnUiThread(() -> txtCentral.setText("Processing face landmarks..."));
+//            nextStepOverlay.setVisibility(View.GONE);
             // Run face landmark detection in background
             new Thread(() -> {
-                if (faceLandmarker == null) {
-                    runOnUiThread(() -> txtCentral.setText("FaceLandmarker not initialized."));
-                    return;
-                }
-                List<FaceLandmarkerResult> results = detectAllPhotoLandmarks(faceLandmarker);
-                StringBuilder sb = new StringBuilder();
-                sb.append("Face detection results:\n");
-                sb.append("Size = ").append(results.size()).append("\n\n");
-                for (int i = 0; i < results.size(); i++) {
-                    FaceLandmarkerResult r = results.get(i);
-                    int count = (r != null && r.faceLandmarks() != null) ? r.faceLandmarks().size() : 0;
-                    sb.append("Photo ").append(i + 1).append(": ").append(count).append(" face(s)\n");
-                }
-                runOnUiThread(() -> txtCentral.setText(sb.toString()));
+
                 filterFramesWithNoFace(results);
-                saveLandmarksToPtsFiles(results, photoUris);
+                saveLandmarksToPtsFiles(results, photoFilePaths);
+
+                callJNI();
+
             }).start();
         });
 
@@ -563,12 +554,12 @@ public class MainActivity extends AppCompatActivity {
      */
     public List<FaceLandmarkerResult> detectAllPhotoLandmarks(FaceLandmarker faceLandmarker) {
         // print to log for debugging
-        Log.d("FaceLandmarker", "Starting landmark detection for " + photoUris.size() + " photos");
+        Log.d("FaceLandmarker", "Starting landmark detection for " + photoFilePaths.size() + " photos");
         List<FaceLandmarkerResult> results = new ArrayList<>();
-        for (Uri uri : photoUris) {
+        for (String path : photoFilePaths) {
             try {
                 // Read image as Bitmap
-                InputStream inputStream = getContentResolver().openInputStream(uri);
+                InputStream inputStream = getContentResolver().openInputStream(Uri.fromFile(new File(path)));
                 Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
                 if (inputStream != null) inputStream.close();
                 if (bitmap == null) {
@@ -591,20 +582,21 @@ public class MainActivity extends AppCompatActivity {
     private void filterFramesWithNoFace(List<FaceLandmarkerResult> results) {
         for (int i = results.size() - 1; i >= 0; i--) {
             FaceLandmarkerResult r = results.get(i);
-            boolean hasFace = (r != null && r.faceLandmarks() != null && r.faceLandmarks().size() != 1);
+            boolean hasFace = (r != null && r.faceLandmarks() != null && r.faceLandmarks().size() == 1);
             if (!hasFace) {
                 results.remove(i);
-                if (i < photoUris.size()) photoUris.remove(i);
+                if (i < photoFilePaths.size()) photoFilePaths.remove(i);
                 if (i < photoImuEntries.size()) photoImuEntries.remove(i);
             }
         }
     }
 
     /**
-     * 保存每个 FaceLandmarkerResult 的 landmarks 到 .pts 文件，存储到 Downloads/FaceCaptures 文件夹
+     * store each FaceLandmarkerResult in .pts file
      */
-    private void saveLandmarksToPtsFiles(List<FaceLandmarkerResult> results, List<Uri> uris) {
+    private void saveLandmarksToPtsFiles(List<FaceLandmarkerResult> results, List<String> photoPaths) {
         if (baseName == null) return;
+        File dir = getExternalFilesDir(null);
         for (int i = 0; i < results.size(); i++) {
             FaceLandmarkerResult result = results.get(i);
             if (result == null || result.faceLandmarks() == null || result.faceLandmarks().isEmpty()) continue;
@@ -614,9 +606,10 @@ public class MainActivity extends AppCompatActivity {
             List<NormalizedLandmark> landmarks = faces.get(0);
             if (landmarks == null || landmarks.isEmpty()) continue;
 
-            String ptsFileName = baseName + "_Cam_" + (i + 1) + ".pts";
+            String ptsFileName = baseName + "_Landmarks_"+ (i + 1) + ".pts";
+            File ptsFile = new File(dir, ptsFileName);
 
-            // 构造pts内容
+            // construct .pts file content (normalized landmark coordinates)
             StringBuilder sb = new StringBuilder();
             sb.append("version: 1\n");
             sb.append("n_points: ").append(landmarks.size()).append("\n");
@@ -626,26 +619,99 @@ public class MainActivity extends AppCompatActivity {
             }
             sb.append("}\n");
 
-            // 保存到 Downloads/FaceCaptures
-            ContentValues contentValues = new ContentValues();
-            contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, ptsFileName);
-            contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
-            contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH,
-                    Environment.DIRECTORY_DOWNLOADS + File.separator + "FaceCaptures");
-            Uri collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
-            Uri ptsUri = getContentResolver().insert(collectionUri, contentValues);
-            if (ptsUri == null) {
-                Log.w("PTS", "Failed to create MediaStore entry for " + ptsFileName);
-                continue;
-            }
-            try (java.io.OutputStream outputStream = getContentResolver().openOutputStream(ptsUri)) {
-                if (outputStream == null) throw new IOException("Failed to open output stream");
-                outputStream.write(sb.toString().getBytes());
-                outputStream.flush();
+            try (FileOutputStream fos = new FileOutputStream(ptsFile)) {
+                fos.write(sb.toString().getBytes());
+                fos.flush();
+                Log.i("PTS", "Saved pts file: " + ptsFile.getAbsolutePath());
+                ptsFilePaths.add(ptsFile.getAbsolutePath()); // save path for ndk
             } catch (IOException e) {
                 Log.w("PTS", "Failed to save pts file: " + ptsFileName + ", " + e.getMessage());
             }
         }
     }
 
+    private void callJNI() {
+        try {
+            AssetCopyUtils.copyAssetsFolderToExternal(this, "share");
+        } catch (Exception e) {
+            Log.e("CallJNI", "Failed to copy assets/share: " + e.getMessage());
+        }
+
+        String externalDirPath = getExternalFilesDir(null).getAbsolutePath();
+        String[] imagePathsArr = photoFilePaths.toArray(new String[0]);
+        String[] landmarkPathsArr = ptsFilePaths.toArray(new String[0]);
+
+        String JNIresult = runJNI(imageHeight, imageWidth, externalDirPath, imagePathsArr, landmarkPathsArr);
+
+        StringBuilder finalResult = new StringBuilder();
+        finalResult.append(JNIresult);
+        finalResult.append("\n");
+
+        try {
+            File srcObj = new File(externalDirPath, "out.obj");
+            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File faceModelDir = new File(downloadsDir, "FaceModel");
+            if (!faceModelDir.exists()) {
+                faceModelDir.mkdirs();
+            }
+            File destObj = new File(faceModelDir, "out.obj");
+            copyFile(srcObj, destObj);
+            finalResult.append("out.obj exported to ").append(destObj.getAbsolutePath());
+
+            File srcMtl = new File(externalDirPath, "out.mtl");
+            if (srcMtl.exists()) {
+                File destMtl = new File(faceModelDir, "out.mtl");
+                copyFile(srcMtl, destMtl);
+                finalResult.append("\nout.mtl exported to ").append(destMtl.getAbsolutePath());
+            }
+            File srcTex = new File(externalDirPath, "out.texture.png");
+            if (srcTex.exists()) {
+                File destTex = new File(faceModelDir, "out.texture.png");
+                copyFile(srcTex, destTex);
+                finalResult.append("\nout.texture.png exported to ").append(destTex.getAbsolutePath());
+            }
+            File srcGltf = new File(externalDirPath, "out.gltf");
+            if (srcGltf.exists()) {
+                File destGltf = new File(faceModelDir, "out.gltf");
+                copyFile(srcGltf, destGltf);
+                finalResult.append("\nout.gltf exported to ").append(destGltf.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            finalResult.append("Failed exporting out.obj:").append(e.getMessage());
+            Log.e("CallJNI", "Failed exporting out.obj", e);
+        }
+        runOnUiThread(() -> txtCentral.setText(finalResult.toString()));
+        
+        
+//        finishAffinity();
+    }
+
+
+    private static void copyFile(File src, File dst) throws IOException {
+        try (InputStream in = new java.io.FileInputStream(src); java.io.OutputStream out = new java.io.FileOutputStream(dst)) {
+            byte[] buf = new byte[4096];
+            int len;
+            while ((len = in.read(buf)) > 0) {
+                out.write(buf, 0, len);
+            }
+        }
+    }
+
+    // callback for native code to update status on UI thread
+    public void updateStatus(final String msg) {
+        runOnUiThread(() -> {
+            if (txtCentral != null) txtCentral.setText(msg);
+        });
+    }
+
+    private void deleteAllExceptShared() {
+        File dir = getExternalFilesDir(null);
+        if (dir == null || !dir.exists()) return;
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            if (file.getName().equals("shared")) continue;
+            file.delete();
+        }
+    }
 }
