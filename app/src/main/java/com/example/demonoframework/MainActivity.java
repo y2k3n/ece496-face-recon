@@ -15,6 +15,9 @@ import android.os.Bundle;
 import android.util.Log;
 import android.Manifest;
 import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,6 +59,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import android.os.Environment;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import android.os.Build;
+import java.io.OutputStream;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -141,6 +148,13 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
         }
 
+//        // request write permission for saving photos and IMU data
+//        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+//                != PackageManager.PERMISSION_GRANTED) {
+//            ActivityCompat.requestPermissions(this,
+//                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+//        }
+
         deleteAllExceptShared();
 
         btnStart.setOnClickListener(v -> takePhoto());
@@ -158,6 +172,13 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> txtCentral.setText("Camera permission required."));
             }
         }
+//        else if (requestCode == 1) {
+//            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+//                // do nothing special, we will save files when needed and handle errors if permission is not granted
+//            } else {
+//                runOnUiThread(() -> txtCentral.setText("Write permission not granted.\nPhotos and IMU data cannot be saved!"));
+//            }
+//        }
     }
 
 
@@ -647,52 +668,80 @@ public class MainActivity extends AppCompatActivity {
         finalResult.append(JNIresult);
         finalResult.append("\n");
 
+
+        clearFaceModelInDownloadsWithMediaStore();
+
         try {
             File srcObj = new File(externalDirPath, "out.obj");
-            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-            File faceModelDir = new File(downloadsDir, "FaceModel");
-            if (!faceModelDir.exists()) {
-                faceModelDir.mkdirs();
+            if (srcObj.exists()) {
+                exportToDownloadsWithMediaStore(srcObj, "out.obj", "application/x-tgif");
+                finalResult.append("out.obj exported to Downloads/FaceModel/out.obj");
             }
-            File destObj = new File(faceModelDir, "out.obj");
-            copyFile(srcObj, destObj);
-            finalResult.append("out.obj exported to ").append(destObj.getAbsolutePath());
-
             File srcMtl = new File(externalDirPath, "out.mtl");
             if (srcMtl.exists()) {
-                File destMtl = new File(faceModelDir, "out.mtl");
-                copyFile(srcMtl, destMtl);
-                finalResult.append("\nout.mtl exported to ").append(destMtl.getAbsolutePath());
+                exportToDownloadsWithMediaStore(srcMtl, "out.mtl", "application/octet-stream");
+                finalResult.append("\nout.mtl exported to Downloads/FaceModel/out.mtl");
             }
             File srcTex = new File(externalDirPath, "out.texture.png");
             if (srcTex.exists()) {
-                File destTex = new File(faceModelDir, "out.texture.png");
-                copyFile(srcTex, destTex);
-                finalResult.append("\nout.texture.png exported to ").append(destTex.getAbsolutePath());
+                exportToDownloadsWithMediaStore(srcTex, "out.texture.png", "image/png");
+                finalResult.append("\nout.texture.png exported to Downloads/FaceModel/out.texture.png");
             }
             File srcGltf = new File(externalDirPath, "out.gltf");
             if (srcGltf.exists()) {
-                File destGltf = new File(faceModelDir, "out.gltf");
-                copyFile(srcGltf, destGltf);
-                finalResult.append("\nout.gltf exported to ").append(destGltf.getAbsolutePath());
+                exportToDownloadsWithMediaStore(srcGltf, "out.gltf", "model/gltf+json");
+                finalResult.append("\nout.gltf exported to Downloads/FaceModel/out.gltf");
             }
         } catch (Exception e) {
-            finalResult.append("Failed exporting out.obj:").append(e.getMessage());
-            Log.e("CallJNI", "Failed exporting out.obj", e);
+            finalResult.append("Failed exporting files to Downloads:" + e.getMessage());
+            Log.e("CallJNI", "Failed exporting files to Downloads", e);
         }
         runOnUiThread(() -> txtCentral.setText(finalResult.toString()));
-        
-        
-//        finishAffinity();
+        // finishAffinity();
     }
 
-
-    private static void copyFile(File src, File dst) throws IOException {
-        try (InputStream in = new java.io.FileInputStream(src); java.io.OutputStream out = new java.io.FileOutputStream(dst)) {
+    private void exportToDownloadsWithMediaStore(File srcFile, String fileName, String mimeType) throws IOException {
+        // 1. first delete any existing file with the same name in Downloads/FaceModel/ to avoid duplicates
+        String selection = MediaStore.Downloads.RELATIVE_PATH + "=? AND " + MediaStore.Downloads.DISPLAY_NAME + "=?";
+        String[] selectionArgs = new String[]{"Download/FaceModel/", fileName};
+        Uri collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+        try (android.database.Cursor cursor = getContentResolver().query(collection, new String[]{MediaStore.Downloads._ID}, selection, selectionArgs, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID));
+                Uri deleteUri = Uri.withAppendedPath(collection, String.valueOf(id));
+                getContentResolver().delete(deleteUri, null, null);
+            }
+        }
+        // 2. insert new file record into MediaStore and get the output URI
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+        values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.put(MediaStore.Downloads.RELATIVE_PATH, "Download/FaceModel/");
+        }
+        Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+        if (uri == null) throw new IOException("Failed to create MediaStore entry for " + fileName);
+        try (OutputStream out = getContentResolver().openOutputStream(uri);
+             InputStream in = new java.io.FileInputStream(srcFile)) {
             byte[] buf = new byte[4096];
             int len;
             while ((len = in.read(buf)) > 0) {
                 out.write(buf, 0, len);
+            }
+        }
+    }
+
+    private void clearFaceModelInDownloadsWithMediaStore() {
+        Uri collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+        String selection = MediaStore.Downloads.RELATIVE_PATH + "+?";
+        String[] selectionArgs = new String[]{"Download/FaceModel/"};
+        try (android.database.Cursor cursor = getContentResolver().query(collection, new String[]{MediaStore.Downloads._ID}, selection, selectionArgs, null)) {
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID));
+                    Uri deleteUri = Uri.withAppendedPath(collection, String.valueOf(id));
+                    getContentResolver().delete(deleteUri, null, null);
+                }
             }
         }
     }
