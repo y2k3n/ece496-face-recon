@@ -33,7 +33,7 @@
 
 #include "tiny_gltf.h"
 
-constexpr int texture_res = 1024;
+constexpr int texture_res = 4096;
 constexpr int max_threads = 8;
 
 bool write_mesh_gltf(const eos::core::Mesh &mesh, const std::string &gltf_file,
@@ -272,8 +272,9 @@ eos::core::Image4u merge_isomaps_weighed(const std::vector<eos::core::Image4u> &
                     // std::cout << "isomap(r, c)[3]: " << (int)isomap(r, c)[3] <<
                     // std::endl;
                     float alpha = isomap(r, c)[3] / 255.0f;
+                    alpha -= thold;
                     // std::cout << "alpha: " << alpha << std::endl;
-                    if (alpha > thold) {
+                    if (alpha > 1e-5) {
                         sum_rgb[0] += isomap(r, c)[0] * alpha;
                         sum_rgb[1] += isomap(r, c)[1] * alpha;
                         sum_rgb[2] += isomap(r, c)[2] * alpha;
